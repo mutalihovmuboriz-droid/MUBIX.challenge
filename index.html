@@ -147,6 +147,11 @@ body{background-image:none;font-family:"Nunito","Trebuchet MS",system-ui,sans-se
 #en{display:inline-block;padding:0 10px;background:linear-gradient(transparent 62%,rgba(255,201,60,.8) 62%)}
 .time{height:14px}.time i{border-radius:9px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.level-options{display:grid;gap:10px;margin-top:14px}
+.level-choice{width:100%;text-align:left;background:var(--card);color:var(--ink);border:2px solid var(--line);border-bottom:5px solid var(--line);padding:14px 16px;font-size:20px;box-shadow:0 3px 0 var(--line);border-radius:16px}
+.level-choice strong{display:block;font-weight:800}
+.level-choice small{display:block;color:var(--soft);font-size:15px;margin-top:4px}
+.level-choice.active{border-color:#58CC02;background:rgba(88,204,2,.08);box-shadow:0 3px 0 #58A700}
 </style>
 </head>
 <body>
@@ -165,12 +170,24 @@ body{background-image:none;font-family:"Nunito","Trebuchet MS",system-ui,sans-se
 <section id="s-hub" class="hide">
   <h2 id="hello2" style="font-size:36px"></h2>
   <span class="pill" id="hubBest" style="display:inline-block;margin:10px 0 0">🏆 Беҳтарин натиҷа: 0</span>
+  <button class="pill back" id="levelBtn" style="margin:10px 0 0">📘 Сатҳ: A1 — Осон</button>
   <p>Бозиро интихоб кун:</p>
   <div class="topics one" id="hubList"></div>
 </section>
 
+<section id="s-level" class="hide">
+  <button class="pill back" id="levelBack" style="margin-bottom:12px">← Бозиҳо</button>
+  <h2 style="font-size:34px">Сатҳи худро интихоб кун</h2>
+  <p>Калимаҳо ва душвории бозӣ бо сатҳ иваз мешаванд.</p>
+  <div class="level-options">
+    <button class="level-choice" data-level="a1" aria-pressed="false"><strong>🌱 A1 — Осон</strong><small>Калимаҳои асосӣ</small></button>
+    <button class="level-choice" data-level="a2" aria-pressed="false"><strong>🚀 A2 — Миёна</strong><small>Калимаҳои каме душвортар</small></button>
+  </div>
+</section>
+
 <section id="s-topics" class="hide">
   <button class="pill back" id="toHub" style="margin-bottom:12px">← Бозиҳо</button>
+  <span class="pill" id="currentLevel" style="display:inline-block;margin-bottom:12px"></span>
   <h2 id="hello" style="font-size:36px"></h2>
   <p>Мавзӯъро интихоб кун:</p>
   <div class="topics" id="topicList"></div>
@@ -266,13 +283,27 @@ TOPICS["Рангҳо"]={icon:"🎨",w:[["red","сурх"],["blue","кабуд"],
 TOPICS["Ададҳо"]={icon:"🔢",w:[["one","як"],["two","ду"],["three","се"],["four","чор"],["five","панҷ"],["six","шаш"],["seven","ҳафт"],["eight","ҳашт"],["nine","нӯҳ"],["ten","даҳ"]]};
 TOPICS["Оила"]={icon:"👪",w:[["mother","модар"],["father","падар"],["sister","хоҳар"],["brother","бародар"],["grandmother","бибӣ"],["grandfather","бобо"],["son","писар"],["daughter","духтар"],["baby","кӯдак"],["family","оила"]]};
 TOPICS["Бадан"]={icon:"🖐️",w:[["head","сар"],["hand","даст"],["eye","чашм"],["ear","гӯш"],["nose","бинӣ"],["mouth","даҳон"],["hair","мӯй"],["finger","ангушт"],["tooth","дандон"],["foot","по"]]};
+const A2_TOPICS={
+ "Ҳайвонот":[["fox","рӯбоҳ"],["bear","хирс"],["turtle","сангпушт"],["eagle","уқоб"],["dolphin","делфин"]],
+ "Хӯрок":[["carrot","сабзӣ"],["grapes","ангур"],["cheese","панир"],["honey","асал"],["butter","равған"]],
+ "Мактаб":[["dictionary","луғат"],["notebook","дафтар"],["homework","вазифаи хонагӣ"],["subject","фан"],["exam","имтиҳон"]],
+ "Варзиш":[["athlete","варзишгар"],["practice","тамрин"],["medal","медал"],["competition","мусобиқа"],["training","машқ"]],
+ "Рангҳо":[["bright","равшан"],["dark","тира"],["gold","тиллоӣ"],["silver","нуқрагун"],["colorful","рангоранг"]],
+ "Ададҳо":[["eleven","ёздаҳ"],["twelve","дувоздаҳ"],["twenty","бист"],["hundred","сад"],["thousand","ҳазор"]],
+ "Оила":[["parents","волидайн"],["grandchild","набера"],["relative","хешованд"],["twins","дугоникҳо"],["married","оиладор"]],
+ "Бадан":[["shoulder","китф"],["neck","гардан"],["knee","зону"],["stomach","шикам"],["ankle","тағояк"]]
+};
+let level="a1";try{level=localStorage.getItem("mx_level")==="a2"?"a2":"a1"}catch(e){}
+function wordsFor(t){return [...TOPICS[t].w,...(level==="a2"?(A2_TOPICS[t]||[]):[])]}
+function bestKey(t,l=level){return "mx_best_"+l+"_"+t}
+function bestScore(t,l=level){try{const v=localStorage.getItem(bestKey(t,l));if(v!==null)return +v||0;if(l==="a1")return +localStorage.getItem("mx_best_"+t)||0}catch(e){}return 0}
 const ROUND=8,TIME=15;
 const $=id=>document.getElementById(id);
 let user="",topic="",qs=[],i=0,score=0,streak=0,timer=null,left=TIME,locked=false;
 let ctx=null,gid=0;
 function beep(f,d){try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=f;g.gain.value=.08;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+d)}catch(e){}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.lang="en-US";u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
-function show(id){["s-start","s-hub","s-topics","s-game","s-match","s-build","s-hang","s-cset","s-cplay","s-cend","s-end"].forEach(s=>$(s).classList.toggle("hide",s!==id))}
+function show(id){["s-start","s-hub","s-level","s-topics","s-game","s-match","s-build","s-hang","s-cset","s-cplay","s-cend","s-end"].forEach(s=>$(s).classList.toggle("hide",s!==id))}
 function shuffle(a){a=a.slice();for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a}
 try{user=localStorage.getItem("mx_name")||"";$("name").value=user}catch(e){}
 $("start").onclick=()=>{user=$("name").value.trim();if(!user){$("name").focus();return}
@@ -280,16 +311,20 @@ $("start").onclick=()=>{user=$("name").value.trim();if(!user){$("name").focus();
  $("hello").textContent=$("hello2").textContent="Салом, "+user+"!";show("s-hub")};
 $("name").onkeydown=e=>{if(e.key==="Enter")$("start").click()};
 const COL=["#FF8A6B","#FFC93C","#4FD1A5","#9B8CFF"];
-function topicCards(){$("topicList").innerHTML="";Object.keys(TOPICS).forEach((t,n)=>{let best=0;try{best=+localStorage.getItem("mx_best_"+t)||0}catch(e){}const b=document.createElement("button");b.className="topic";b.style.setProperty("--c",["#58CC02","#1CB0F6","#A560E8","#FF9600","#FF4B4B","#14D4F4","#8549BA","#E6A800"][n]);b.innerHTML="<span>"+TOPICS[t].icon+"</span>"+t+"<small>"+(best?"Рекорд: "+best:TOPICS[t].w.length+" калима")+"</small>";b.onclick=()=>play(t);$("topicList").appendChild(b)})}
-topicCards();
+function topicCards(){$("topicList").innerHTML="";Object.keys(TOPICS).forEach((t,n)=>{const best=bestScore(t);const wordCount=wordsFor(t).length;const b=document.createElement("button");b.className="topic";b.style.setProperty("--c",["#58CC02","#1CB0F6","#A560E8","#FF9600","#FF4B4B","#14D4F4","#8549BA","#E6A800"][n]);b.innerHTML="<span>"+TOPICS[t].icon+"</span>"+t+"<small>"+(best?"Рекорд: "+best:wordCount+" калима")+"</small>";b.onclick=()=>play(t);$("topicList").appendChild(b)})}
+function updateLevelUI(){const label=level==="a2"?"A2 — Миёна":"A1 — Осон";$("levelBtn").textContent="📘 Сатҳ: "+label;$("currentLevel").textContent="Сатҳ: "+label;document.querySelectorAll(".level-choice").forEach(b=>{const active=b.dataset.level===level;b.classList.toggle("active",active);b.setAttribute("aria-pressed",active?"true":"false")})}
+$("levelBtn").onclick=()=>{updateLevelUI();show("s-level")};
+$("levelBack").onclick=()=>show("s-hub");
+document.querySelectorAll(".level-choice").forEach(b=>b.onclick=()=>{level=b.dataset.level;try{localStorage.setItem("mx_level",level)}catch(e){}topicCards();updateLevelUI();show("s-hub")});
+topicCards();updateLevelUI();
 let mode="quiz";
-function play(t){gid++;topic=t;score=0;streak=0;i=0;if(mode==="match")return startMatch();if(mode==="build")return startBuild();if(mode==="hang")return startHang();qs=shuffle(TOPICS[t].w).slice(0,ROUND);show("s-game");ask()}
+function play(t){gid++;topic=t;score=0;streak=0;i=0;if(mode==="match")return startMatch();if(mode==="build")return startBuild();if(mode==="hang")return startHang();qs=shuffle(wordsFor(t)).slice(0,ROUND);show("s-game");ask()}
 function ask(){
  locked=false;left=TIME;const [en,tg]=qs[i];
  $("q").textContent=(i+1)+"/"+qs.length;$("streak").textContent="🔥 "+streak;$("score").textContent=score;
  $("en").textContent=mode==="listen"?"🎧":en;$("qHint").textContent=mode==="listen"?"Гӯш кун ва тарҷумаро интихоб кун:":"Тарҷумаи ин калимаро ёб:";
  $("dots").innerHTML=qs.map((_,n)=>"<s class='"+(n<i?"d":n===i?"c":"")+"'></s>").join("");
- const pool=Object.values(TOPICS).flatMap(x=>x.w.map(p=>p[1])).filter(x=>x!==tg);
+ const pool=Object.keys(TOPICS).flatMap(t=>wordsFor(t).map(p=>p[1])).filter(x=>x!==tg);
  const opts=shuffle([tg,...shuffle(pool).slice(0,3)]);
  $("opts").innerHTML="";
  opts.forEach((o,n)=>{const b=document.createElement("button");b.className="opt";b.dataset.v=o;b.innerHTML="<i>"+"ABCD"[n]+"</i><span></span>";b.lastChild.textContent=o;b.onclick=()=>pick(b,o===tg,tg);$("opts").appendChild(b)});
@@ -312,14 +347,14 @@ function finish(pp){
  $("stars").textContent="⭐".repeat(n)+"☆".repeat(3-n);
  $("endTitle").textContent=n===3?"Офарин, "+user+"!":n===2?"Хуб, "+user+"!":"Давом деҳ, "+user+"!";
  $("finalScore").textContent=score+" хол";
- let best=0;try{const k="mx_best_"+topic;best=+localStorage.getItem(k)||0;if(score>best){localStorage.setItem(k,score);best=score;$("best").textContent="Рекорди нав! 🎉"}else $("best").textContent="Беҳтарин натиҷа: "+best}catch(e){$("best").textContent=""}
+ let best=bestScore(topic,level);try{const k=bestKey(topic,level);if(score>best){localStorage.setItem(k,score);best=score;$("best").textContent="Рекорди нав! 🎉"}else $("best").textContent="Беҳтарин натиҷа: "+best}catch(e){$("best").textContent=""}
 }
 const HUB=[["quiz","🎯","Калима ва тарҷума","Ҷавоби дурустро интихоб кун"],["match","🃏","Ҷуфт кардан","Калима ва тарҷумаро пайваст кун"],["build","🔤","Калимаро ҷамъ кун","Ҳарфҳоро ба тартиб овар"],["listen","🎧","Гӯш кун ва интихоб кун","Калимаро шунав, тарҷумаро ёб"],["hang","❓","Ҳарфро тахмин кун","Калимаро ҳарф ба ҳарф ёб"],["class","🏫","Режими синфӣ","Навбат ва холҳо барои тамоми синф"]],HC=["#1CB0F6","#A560E8","#FF9600","#14D4F4","#FF4B4B","#58CC02"];
 HUB.forEach((g,n)=>{const b=document.createElement("button");b.className="topic";b.style.setProperty("--c",HC[n]);b.innerHTML="<span>"+g[1]+"</span><div>"+g[2]+"<small>"+g[3]+"</small></div>";b.onclick=()=>{mode=g[0];if(mode==="class"){cRender();show("s-cset")}else show("s-topics")};$("hubList").appendChild(b)});
 $("toHub").onclick=()=>show("s-hub");
 $("mExit").onclick=$("bExit").onclick=()=>{gid++;topicCards();show("s-topics")};
 function startMatch(){
- const ws=shuffle(TOPICS[topic].w).slice(0,6),g=gid;
+ const ws=shuffle(wordsFor(topic)).slice(0,6),g=gid;
  const cards=shuffle(ws.flatMap((w,k)=>[{k,t:w[0],en:1},{k,t:w[1],en:0}]));
  let sel=null,busy=false,done=0,miss=0;
  $("mMiss").textContent="❌ 0";$("mGrid").innerHTML="";show("s-match");
@@ -334,7 +369,7 @@ function startMatch(){
    else{miss++;$("mMiss").textContent="❌ "+miss;busy=true;beep(200,.25);p.b.classList.add("no");b.classList.add("no");setTimeout(()=>{[p.b,b].forEach(x=>x.classList.remove("on","no"));busy=false},700)}
   };$("mGrid").appendChild(b)});
 }
-function startBuild(){qs=shuffle(TOPICS[topic].w).slice(0,6);i=0;score=0;buildNext()}
+function startBuild(){qs=shuffle(wordsFor(topic)).slice(0,6);i=0;score=0;buildNext()}
 function buildNext(){
  show("s-build");const [en,tg]=qs[i],g=gid;let miss=0,pick=[];
  $("bq").textContent=(i+1)+"/"+qs.length;$("bScore").textContent=score;$("bTg").textContent=tg;
@@ -351,7 +386,7 @@ function buildNext(){
  $("bSay").onclick=()=>speak(en);
 }
 $("hExit").onclick=()=>{gid++;topicCards();show("s-topics")};
-function startHang(){qs=shuffle(TOPICS[topic].w).slice(0,6);i=0;score=0;hangNext()}
+function startHang(){qs=shuffle(wordsFor(topic)).slice(0,6);i=0;score=0;hangNext()}
 function hangNext(){
  show("s-hang");const [en,tg]=qs[i],g=gid,W=en.toUpperCase();let lives=6,over=false;const got=new Set();
  $("hq").textContent=(i+1)+"/"+qs.length;$("hTg").textContent=tg;
@@ -368,7 +403,7 @@ function hangNext(){
   keys.appendChild(b)});
  $("hSay").onclick=()=>speak(en);
 }
-function hubBest(){let m=0;try{Object.keys(TOPICS).forEach(t=>{m=Math.max(m,+localStorage.getItem("mx_best_"+t)||0)})}catch(e){}$("hubBest").textContent="🏆 Беҳтарин натиҷа: "+m}
+function hubBest(){let m=0;try{Object.keys(TOPICS).forEach(t=>{m=Math.max(m,bestScore(t,"a1"),bestScore(t,"a2"))})}catch(e){}$("hubBest").textContent="🏆 Беҳтарин натиҷа: "+m}
 const _show=show;show=function(id){_show(id);if(id==="s-hub")hubBest()};
 document.body.insertAdjacentHTML("afterbegin",'<div class="bg" aria-hidden="true">'+["A","B","C","?","★","Z","Q","♪"].map((c,n)=>'<span style="--s:'+(60+n%3*30)+'px;--x:'+((n*13+5)%90)+'%;--y:'+((n*29+8)%85)+'%;--d:'+(7+n%4*2)+'s">'+c+'</span>').join("")+"</div>");
 $("s-start").insertAdjacentHTML("afterbegin",'<div class="owl" aria-hidden="true">🚀</div>');
@@ -384,13 +419,13 @@ function cSel(){[...$("cModes").children].forEach(b=>b.classList.toggle("sel",b.
 [2,3,5].forEach(r=>{const b=document.createElement("button");b.className="chip";b.dataset.v=r;b.textContent=r+" давр";b.onclick=()=>{cRounds=r;cSel()};$("cRoundsB").appendChild(b)});cSel();
 function cBoard(pl){const B=$("cBoard");B.innerHTML="";if(cMode==="race"){B.className="lanes";cp.forEach((n,k)=>{const d=document.createElement("div");d.className="lane"+(k===pl?" me":"");const a=document.createElement("b");a.textContent=n;const t=document.createElement("div");t.className="trk";const c=document.createElement("i");c.textContent="🚗";c.style.left="calc((100% - 64px) * "+(cs[k]/GOAL)+")";const f=document.createElement("em");f.textContent="🏁";t.append(c,f);d.append(a,t);B.appendChild(d)});return}B.className="board";cp.forEach((n,k)=>{const d=document.createElement("div");d.className="sc"+(k===pl?" me":"");const a=document.createElement("b");a.textContent=n;const s=document.createElement("span");s.textContent=cs[k];d.append(a,s);B.appendChild(d)})}
 function cStart(){
- const pool=cTopic==="all"?Object.values(TOPICS).flatMap(x=>x.w):TOPICS[cTopic].w,n=cp.length*cRounds;
+ const pool=cTopic==="all"?Object.keys(TOPICS).flatMap(t=>wordsFor(t)):wordsFor(cTopic),n=cp.length*cRounds;
  const N=cMode==="race"?80:n;cq=[];while(cq.length<N)cq.push(...shuffle(pool));cq=cq.slice(0,N);cs=cp.map(()=>0);ci=0;gid++;show("s-cplay");cAsk();
 }
 function cAsk(){
  cLock=false;const [en,tg]=cq[ci],pl=ci%cp.length;
  $("cTurn").textContent=cp[pl];$("cQ").textContent=cMode==="race"?"🏁 "+GOAL+" қадам":(ci+1)+"/"+cq.length;$("cEn").textContent=en;
- const pool=Object.values(TOPICS).flatMap(x=>x.w.map(p=>p[1])).filter(x=>x!==tg);
+ const pool=Object.keys(TOPICS).flatMap(t=>wordsFor(t).map(p=>p[1])).filter(x=>x!==tg);
  $("cOpts").innerHTML="";
  shuffle([tg,...shuffle(pool).slice(0,3)]).forEach((o,n)=>{const b=document.createElement("button");b.className="opt big";b.dataset.v=o;b.innerHTML="<i>"+"ABCD"[n]+"</i><span></span>";b.lastChild.textContent=o;b.onclick=()=>cPick(b,o===tg,tg,pl);$("cOpts").appendChild(b)});
  $("cSay").onclick=()=>speak(en);speak(en);cBoard(pl);
